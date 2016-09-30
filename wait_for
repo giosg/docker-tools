@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# Helper script to wait for some command to succeed
+# usage wait_for [-t <wait for sec>|--timeout=<wait for sec>] [-s <sleep period>|--sleep=<sleep_period>] <command>
+# defaults:
+#   timeout: 10 s
+#   sleep period: 2 s
+
+# Example: wait for cassandra to respond in localhost
+# wait_for -t 50 nc -w0 localhost 9042
+
+wait_for () {
+  while [[ $# > 1 ]]
+  do
+    key=$1
+    case $key in
+      -t)
+        timeout=$2
+        shift 2
+      ;;
+      --timeout=*)
+        timeout=${key#*=}
+        shift
+      ;;
+      -s)
+        sleep_period=$2
+        shift 2
+      ;;
+      --sleep=*)
+        sleep_period=${key#*=}
+        shift
+      ;;
+      *)
+        break
+      ;;
+    esac
+  done
+
+  start=$(date +%s);
+  end=$(($start + ${timeout:-10}));
+  until ( "$@" ); do
+    if [ $(date +%s) -gt $end ]; then
+      return 1;
+    else
+      sleep ${sleep_period:-2};
+    fi;
+  done
+}
+
+wait_for "$@"

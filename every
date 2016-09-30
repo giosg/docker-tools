@@ -1,0 +1,69 @@
+#!/bin/sh
+
+
+usage() {
+    cat <<EOT
+Usage: $0 <timespec> <command>
+
+timespec is parsed and fed to \`date\` to get proper interval
+
+Examples:
+every 3min echo foo
+every '1 hour 34 mins' date
+every '@08:00' xdg-open https://www.youtube.com/watch?v=1-YiaQZz1zY
+every '@friday 16:00' xdg-open https://www.youtube.com/watch?v=vkVidHRkF88
+EOT
+}
+
+verbose () {
+  echo "> $@"
+  "$@"
+}
+
+if [ $# -lt 2 ]
+then
+    usage
+    exit 1
+fi
+
+timespec="$1"
+shift
+
+if [ "$(echo $timespec | head -c1)" = "@" ]
+then
+    at_exact=1
+else
+    at_exact=0
+fi
+
+
+if [ $at_exact -eq 0 ]
+then
+    delta=$(($(date --date="now + $timespec" +%s) - $(date +%s)))
+
+    if ! [ 0 -lt "$delta" ]
+    then
+    echo "invalid timespec $timespec"
+    return 1
+    fi
+
+    while :
+    do
+        ( verbose "$@" )
+        verbose sleep $delta
+    done
+else
+    timespec="${timespec#@}"
+
+    while :
+    do
+        delta=$(($(date --date="$timespec" +%s) - $(date +%s)))
+        if [ $delta -lt 1 ]
+        then
+            delta=$(($(date --date="tomorrow $timespec" +%s) - $(date +%s)))
+        fi
+
+        verbose sleep $delta
+        ( verbose "$@" )
+    done
+fi

@@ -1,0 +1,67 @@
+#!/bin/bash
+
+# Usage: if_changed [--state-file=<state file>] [-f] <target file> <command>
+# Example:
+# if_changed --state-file=/path/to/previous-requirements.state -f requirements.txt pip install -r requirements.txt
+
+set -e
+set -u
+
+if_changed() {
+  while [[ $# > 1 ]]
+  do
+    key=$1
+    case $key in
+      -f)
+        file=$2
+        shift 2
+      ;;
+      --file=*)
+        file=${key#*=}
+        shift
+      ;;
+      --state-file=*)
+        state_file=${key#*=}
+        shift
+      ;;
+      *)
+        if [[ -z "${file-}" ]]; then
+          file="$key"
+          shift
+        else
+          break
+        fi
+      ;;
+    esac
+  done
+
+  if [[ -z "${file-}" ]]; then
+    echo "no --file specified"
+    exit 1
+  fi
+
+  [[ -z "${database_dir:-}" ]] && database_dir="$HOME/.changed_db"
+  mkdir -p "$database_dir"
+
+  path_hash="$(echo "$file" | sha1sum | cut -d' ' -f1)"
+  if [[ -z "${state_file}" ]]
+  then
+    state_file="${database}/${path_hash}"
+  fi
+
+  checksum="$(sha1sum "$file" | cut -d' ' -f1)"
+  if [[ -f "$state_file" ]]
+  then
+    old_checksum="$(cat $state_file)"
+  else
+    old_checksum=""
+  fi
+
+  if [[ "$old_checksum" != "$checksum" ]]
+  then
+    ( "$@" )
+    sha1sum "$file" | cut -d' ' -f1 > "$state_file"
+  fi
+}
+
+if_changed "$@"
